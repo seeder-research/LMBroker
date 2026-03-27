@@ -1,0 +1,47 @@
+# flexlm-broker configuration
+# Copy to /etc/flexlm-broker/broker.conf and edit.
+
+[broker]
+host = 0.0.0.0
+port = 27000
+
+[api]
+host  = 0.0.0.0
+port  = 8080
+# Set a strong token — all REST requests require: Authorization: Bearer <token>
+# Leave empty to disable authentication (not recommended in production).
+token = changeme
+
+[pool]
+# How often (seconds) to poll each backend with lmutil lmstat
+poll_interval_sec  = 30
+# Mark a backend unhealthy after this many consecutive failed polls
+failover_threshold = 3
+
+# Declare each backend FlexLM server as its own [server.N] block.
+# N can be any unique label (1, 2, primary, secondary, …).
+# Supports hundreds of entries.
+[server.1]
+host = licserver1.example.com
+port = 27000
+name = primary
+
+[server.2]
+host = licserver2.example.com
+port = 27000
+name = secondary
+
+# [server.3]
+# host = licserver3.example.com
+# port = 27001
+# name = department-A
+
+[database]
+# Standard libpq connection string
+connstr = host=localhost port=5432 dbname=flexlm user=broker password=secret sslmode=prefer
+
+[logging]
+# Levels: trace | debug | info | warn | error | critical
+level = info
+# Omit 'file' to log to stdout
+# file = /var/log/flexlm-broker/broker.log
