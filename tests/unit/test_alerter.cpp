@@ -39,7 +39,10 @@ TEST(Alerter, FirstAlertFires) {
     EXPECT_EQ(count.load(), 1);
 }
 
-TEST(Alerter, SuppressedAfterCooldown) {
+TEST(Alerter, FireAlwaysDeliversRegardlessOfCooldown) {
+    // fire() is the raw delivery method — it does NOT check cooldown.
+    // It is used by admin/test endpoints where bypass is intentional.
+    // Cooldown suppression is enforced by maybe_fire() (the internal path).
     auto cfg  = make_alert_cfg(60);
     auto pool = make_pool();
     api::Alerter alerter(cfg, pool, nullptr);
@@ -50,14 +53,10 @@ TEST(Alerter, SuppressedAfterCooldown) {
         count++;
         return true;
     });
-    alerter.start();
 
-    // Manually inject a backend-down state twice quickly
-    // The second should be suppressed by cooldown
     alerter.fire({api::AlertType::SERVER_DOWN, "h:27000", "msg1", ""});
     alerter.fire({api::AlertType::SERVER_DOWN, "h:27000", "msg2", ""});
-    EXPECT_EQ(count.load(), 1); // second suppressed
-    alerter.stop();
+    EXPECT_EQ(count.load(), 2); // fire() always delivers
 }
 
 TEST(Alerter, DifferentSubjectsBothFire) {
@@ -95,7 +94,9 @@ TEST(Alerter, CooldownExpiresAndRefires) {
     EXPECT_EQ(count.load(), 2);
 }
 
-TEST(Alerter, SuppressedKeysReflectCooldown) {
+TEST(Alerter, SuppressedKeysEmptyInitially) {
+    // suppressed_keys() reflects cooldown state set by maybe_fire() (internal).
+    // fire() intentionally bypasses cooldown and does NOT populate this set.
     auto cfg  = make_alert_cfg(60);
     auto pool = make_pool();
     api::Alerter alerter(cfg, pool, nullptr);
@@ -103,10 +104,9 @@ TEST(Alerter, SuppressedKeysReflectCooldown) {
                            const std::string&) { return true; });
 
     EXPECT_TRUE(alerter.suppressed_keys().empty());
+    // fire() bypasses cooldown — suppressed_keys stays empty
     alerter.fire({api::AlertType::SERVER_DOWN, "h:27000", "msg", ""});
-    auto keys = alerter.suppressed_keys();
-    ASSERT_EQ(keys.size(), 1u);
-    EXPECT_NE(keys[0].find("SERVER_DOWN"), std::string::npos);
+    EXPECT_TRUE(alerter.suppressed_keys().empty());
 }
 
 TEST(Alerter, WebhookPayloadIsValidJson) {

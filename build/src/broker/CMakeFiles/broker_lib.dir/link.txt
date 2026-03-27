@@ -1,0 +1,2 @@
+/usr/bin/ar qc libbroker_lib.a CMakeFiles/broker_lib.dir/broker.cpp.o CMakeFiles/broker_lib.dir/connection.cpp.o CMakeFiles/broker_lib.dir/framing.cpp.o CMakeFiles/broker_lib.dir/protocol.cpp.o CMakeFiles/broker_lib.dir/thread_pool.cpp.o CMakeFiles/broker_lib.dir/virtual_license.cpp.o
+/usr/bin/ranlib libbroker_lib.a

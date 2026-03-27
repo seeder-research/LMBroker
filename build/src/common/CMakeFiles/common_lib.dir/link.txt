@@ -1,0 +1,2 @@
+/usr/bin/ar qc libcommon_lib.a CMakeFiles/common_lib.dir/config.cpp.o CMakeFiles/common_lib.dir/config_reloader.cpp.o CMakeFiles/common_lib.dir/logger.cpp.o
+/usr/bin/ranlib libcommon_lib.a

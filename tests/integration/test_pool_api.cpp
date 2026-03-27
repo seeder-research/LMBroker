@@ -25,7 +25,7 @@ protected:
 
         tracker_ = std::make_shared<tracker::UsageTracker>(cfg_);
         pool_    = std::make_shared<pool::PoolManager>(cfg_, tracker_);
-        api_     = std::make_shared<api::RestApi>(cfg_, pool_, tracker_);
+        api_     = std::make_shared<api::RestApi>(cfg_, pool_, tracker_, nullptr);
 
         tracker_->start();
         pool_->start();

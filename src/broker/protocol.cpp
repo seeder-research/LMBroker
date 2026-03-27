@@ -19,7 +19,6 @@ HelloMsg HelloMsg::decode(const Packet& pkt) {
 Packet HelloMsg::encode() const {
     Packet pkt;
     pkt.opcode = Opcode::HELLO;
-    write_u32_be(reinterpret_cast<uint8_t*>(pkt.payload.data()), 0);
     pkt.payload.resize(4);
     write_u32_be(pkt.payload.data(), client_version);
     write_lstring(pkt.payload, client_host);

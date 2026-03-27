@@ -1,0 +1,2 @@
+/usr/bin/ar qc libapi_lib.a CMakeFiles/api_lib.dir/alerter.cpp.o CMakeFiles/api_lib.dir/metrics.cpp.o CMakeFiles/api_lib.dir/rest_api.cpp.o
+/usr/bin/ranlib libapi_lib.a

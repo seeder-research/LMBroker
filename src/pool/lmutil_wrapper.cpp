@@ -81,7 +81,7 @@ LmstatResult LmutilWrapper::parse_lmstat(const std::string& output) {
     static const std::regex re_queued(
         R"(\((\d+) licenses?\s+queued\))", std::regex::icase);
     static const std::regex re_feat_vendor(
-        R"("(\S+)"\s+v[\d.]+,\s+vendor:\s+(\w+))", std::regex::icase);
+        R"re("(\S+)"\s+v[\d.]+,\s+vendor:\s+(\w+))re", std::regex::icase);
 
     std::istringstream ss(normalised);
     std::string line;
@@ -123,7 +123,9 @@ LmstatResult LmutilWrapper::parse_lmstat(const std::string& output) {
             last->queued = std::stoi(m[1].str());
             continue;
         }
-        if (last && last->vendor.empty() && std::regex_search(line, m, re_feat_vendor)) {
+        if (last && std::regex_search(line, m, re_feat_vendor)) {
+            // Always prefer explicit vendor from feature detail line over
+            // daemon-section heuristic (handles multi-daemon blocks correctly)
             last->vendor = m[2].str();
         }
     }

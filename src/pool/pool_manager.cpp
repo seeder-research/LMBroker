@@ -28,13 +28,11 @@ void PoolManager::stop() {
 }
 
 void PoolManager::poll_loop() {
-    // Poll immediately on start, then on interval
     while (running_) {
         {
             std::lock_guard<std::mutex> lk(mtx_);
             for (auto& bs : backends_) poll_server(bs);
         }
-        // Sleep in short increments so stop() is responsive
         for (int i = 0; i < cfg_.poll_interval_sec * 10 && running_; ++i)
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
@@ -48,7 +46,6 @@ void PoolManager::poll_server(BackendStatus& bs) {
         spdlog::debug("[pool] {}:{} poll failed (streak={}) — {}",
                       bs.server.host, bs.server.port,
                       bs.fail_streak, res.error_msg);
-
         if (bs.fail_streak >= cfg_.failover_threshold && bs.healthy) {
             bs.healthy = false;
             spdlog::warn("[pool] Backend {}:{} marked UNHEALTHY — {}",
@@ -102,11 +99,11 @@ void PoolManager::poll_server(BackendStatus& bs) {
 
 void PoolManager::add_server(const common::ServerEntry& server) {
     std::lock_guard<std::mutex> lk(mtx_);
-    // Deduplicate by host:port
     for (const auto& bs : backends_)
         if (bs.server.host == server.host && bs.server.port == server.port) return;
     backends_.push_back({server, false, 0, {}});
-    spdlog::info("[pool] Added backend {}:{} ({})", server.host, server.port, server.name);
+    spdlog::info("[pool] Added backend {}:{} ({})",
+                 server.host, server.port, server.name);
 }
 
 bool PoolManager::remove_server(const std::string& host, uint16_t port) {
@@ -121,7 +118,19 @@ bool PoolManager::remove_server(const std::string& host, uint16_t port) {
     return true;
 }
 
+void PoolManager::set_poll_interval(int seconds) {
+    std::lock_guard<std::mutex> lk(mtx_);
+    cfg_.poll_interval_sec = seconds;
+    spdlog::info("[pool] poll_interval updated to {}s", seconds);
+}
 
+void PoolManager::set_failover_threshold(int threshold) {
+    std::lock_guard<std::mutex> lk(mtx_);
+    cfg_.failover_threshold = threshold;
+    spdlog::info("[pool] failover_threshold updated to {}", threshold);
+}
+
+std::vector<FeatureCount> PoolManager::aggregated_features() const {
     std::lock_guard<std::mutex> lk(mtx_);
     std::map<std::string, FeatureCount> agg;
     for (const auto& bs : backends_) {
@@ -129,9 +138,11 @@ bool PoolManager::remove_server(const std::string& host, uint16_t port) {
         for (const auto& f : bs.features) {
             auto& a    = agg[f.feature];
             a.feature  = f.feature;
+            a.vendor   = f.vendor;
             a.total   += f.total;
             a.in_use  += f.in_use;
             a.available += f.available;
+            a.queued  += f.queued;
         }
     }
     std::vector<FeatureCount> result;
@@ -158,15 +169,3 @@ std::vector<BackendStatus> PoolManager::backend_statuses() const {
 }
 
 } // namespace pool
-
-void PoolManager::set_poll_interval(int seconds) {
-    std::lock_guard<std::mutex> lk(mtx_);
-    cfg_.poll_interval_sec = seconds;
-    spdlog::info("[pool] poll_interval updated to {}s", seconds);
-}
-
-void PoolManager::set_failover_threshold(int threshold) {
-    std::lock_guard<std::mutex> lk(mtx_);
-    cfg_.failover_threshold = threshold;
-    spdlog::info("[pool] failover_threshold updated to {}", threshold);
-}

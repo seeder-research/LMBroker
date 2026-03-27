@@ -312,7 +312,7 @@ void RestApi::start() {
 }
 
 void RestApi::serve() {
-    impl_->svr.listen(cfg_.api_host.c_str(), cfg_.api_port);
+    impl_->svr.listen(cfg_.api_host, cfg_.api_port);
 }
 
 void RestApi::stop() {

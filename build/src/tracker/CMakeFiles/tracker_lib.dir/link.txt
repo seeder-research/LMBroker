@@ -1,0 +1,2 @@
+/usr/bin/ar qc libtracker_lib.a CMakeFiles/tracker_lib.dir/usage_tracker.cpp.o CMakeFiles/tracker_lib.dir/db_connection.cpp.o
+/usr/bin/ranlib libtracker_lib.a

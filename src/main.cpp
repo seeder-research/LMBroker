@@ -6,6 +6,7 @@
 #include "common/config.h"
 #include "common/config_reloader.h"
 #include "common/logger.h"
+#include <spdlog/spdlog.h>
 #include "pool/pool_manager.h"
 #include "health/health_monitor.h"
 #include "tracker/usage_tracker.h"

@@ -1,0 +1,2 @@
+/usr/bin/ar qc libpool_lib.a CMakeFiles/pool_lib.dir/pool_manager.cpp.o CMakeFiles/pool_lib.dir/lmutil_wrapper.cpp.o
+/usr/bin/ranlib libpool_lib.a
