@@ -102,7 +102,27 @@ Authorization: Bearer <token>
 | `GET /api/v1/checkouts/active`   | Yes | All currently open checkouts          |
 | `GET /api/v1/health/events`      | Yes | Recent server UP/DOWN events          |
 
-### Example
+### Example — check pool utilisation
+```bash
+curl -H "Authorization: Bearer changeme" http://localhost:8080/api/v1/utilisation
+```
+```json
+[
+  { "feature": "MATLAB", "total": 50, "in_use": 12, "available": 38, "queued": 0, "last_polled": "2026-03-27T10:00:00Z" }
+]
+```
+
+### Example — active checkouts
+```bash
+curl -H "Authorization: Bearer changeme" http://localhost:8080/api/v1/checkouts/active
+```
+```json
+[
+  { "id": 1, "feature": "MATLAB", "username": "jsmith", "client_host": "ws1", "backend_host": "licserver1", "backend_port": 27000, "checked_out_at": "2026-03-27T09:00:00Z", "duration_sec": 3600 }
+]
+```
+
+### Example — original features endpoint (live from lmstat)
 ```bash
 curl -H "Authorization: Bearer changeme" http://localhost:8080/api/v1/features
 ```
@@ -169,7 +189,7 @@ flexlm-broker/
 | 1     | 🔲 Next      | lmutil output parser + pool polling tests           |
 | 2     | ✅ Complete  | Dynamic config reload (SIGHUP + mtime watcher)      |
 | 3     | ✅ Complete  | Full PostgreSQL tracking (checkout/checkin/denial)  |
-| 4     | 🔲 Planned   | FlexLM TCP protocol framing                         |
+| 4     | ✅ Complete  | FlexLM TCP protocol framing, connection state machine, thread pool |
 | 5     | 🔲 Planned   | Alerting webhooks, Prometheus metrics endpoint      |
 
 See `docs/architecture.md` for detailed design notes.

@@ -121,7 +121,71 @@ Convenience views:
 - `v_license_utilisation` — current aggregated counts
 - `v_denial_rate_24h` — denial counts per feature over last 24 h
 
+## Phase 4 — Protocol Layer
+
+### Framing (`src/broker/framing.cpp`)
+
+All FlexLM packets use a 4-byte header:
+
+```
+Bytes 0-1  uint16 BE  payload_length  (bytes that follow the header)
+Bytes 2-3  uint16 BE  opcode
+Bytes 4+   []byte     payload
+```
+
+`FrameReader` accumulates bytes from a TCP stream and emits complete `Packet`
+structs via `pop()`. It handles partial receives, multi-packet buffers, and
+oversized-packet detection.
+
+`frame_packet()` / `send_packet()` / `recv_packet()` form the write path.
+
+### Protocol (`src/broker/protocol.cpp`)
+
+Typed encode/decode for every opcode:
+
+| Opcode | Value | Direction | Description |
+|---|---|---|---|
+| HELLO | 0x0001 | C→S | Client announces version + identity |
+| HELLO_ACK | 0x0002 | S→C | Server version response |
+| CHECKOUT | 0x0010 | C→S | Request feature seat |
+| CHECKOUT_ACK | 0x0011 | S→C | Grant (handle) or deny (reason) |
+| CHECKIN | 0x0020 | C→S | Return feature seat |
+| CHECKIN_ACK | 0x0021 | S→C | Confirm checkin |
+| HEARTBEAT | 0x0030 | C→S | Keepalive |
+| HEARTBEAT_ACK | 0x0031 | S→C | Keepalive echo |
+| QUERY | 0x0040 | C→S | Request feature availability |
+| QUERY_ACK | 0x0041 | S→C | Feature list with counts |
+| ERROR | 0x00FF | Both | Error code + message |
+
+String fields use length-prefixed encoding: 1 byte length, then N chars (no null terminator).
+
+### Connection state machine (`src/broker/connection.cpp`)
+
+```
+INIT ──► NEGOTIATING ──► ACTIVE ──► CLOSING ──► DONE
+              │                          ▲
+              └──────── error ───────────┘
+```
+
+- **NEGOTIATING**: expects HELLO; responds with HELLO_ACK; advances to ACTIVE
+- **ACTIVE**: handles CHECKOUT, CHECKIN, HEARTBEAT, QUERY
+- **CHECKOUT**: queries `PoolManager::select_backend()`, opens a fresh TCP
+  connection to the backend, proxies the message, records CHECKOUT or DENIAL
+  event with the tracker, assigns a broker-local handle
+- **CHECKIN**: matches handle to checkout record, notifies backend, records
+  CHECKIN event; abandoned checkouts on close also emit CHECKIN
+- **QUERY**: answered entirely from `PoolManager::aggregated_features()` — no
+  backend round-trip needed
+- **UNKNOWN opcode**: transparently proxied to first healthy backend
+
+### Thread pool (`src/broker/thread_pool.cpp`)
+
+Fixed-size pool (default 32 threads, queue depth 2048). When the queue is
+full, the *oldest* pending task is dropped (shed load, never block accept).
+`submit()` returns false when the pool is stopping.
+
 ## REST API Reference
+
 
 All endpoints return `Content-Type: application/json`.  
 Authenticated endpoints require: `Authorization: Bearer <token>`

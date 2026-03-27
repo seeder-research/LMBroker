@@ -50,8 +50,18 @@ void RestApi::start() {
         });
 
     // ── GET /api/v1/health ────────────────────────────────────────────────
-    svr.Get("/api/v1/health", [](const httplib::Request&, httplib::Response& res) {
-        res.set_content(R"({"status":"ok"})", "application/json");
+    svr.Get("/api/v1/health", [this](const httplib::Request&, httplib::Response& res) {
+        int healthy = 0, total = 0;
+        for (const auto& bs : pool_->backend_statuses()) {
+            total++;
+            if (bs.healthy) healthy++;
+        }
+        json obj = {
+            {"status",          "ok"},
+            {"servers_healthy", healthy},
+            {"servers_total",   total}
+        };
+        res.set_content(obj.dump(2), "application/json");
     });
 
     // ── GET /api/v1/features ──────────────────────────────────────────────

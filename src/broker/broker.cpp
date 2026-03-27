@@ -1,10 +1,10 @@
 #include "broker/broker.h"
+#include "broker/connection.h"
 #include <spdlog/spdlog.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <unistd.h>
-#include <fcntl.h>
 #include <cerrno>
 #include <cstring>
 
@@ -22,7 +22,7 @@ Broker::~Broker() { stop(); }
 void Broker::start() {
     listen_fd_ = ::socket(AF_INET, SOCK_STREAM, 0);
     if (listen_fd_ < 0) {
-        spdlog::error("[broker] socket() failed: {}", std::strerror(errno));
+        spdlog::error("[broker] socket(): {}", strerror(errno));
         return;
     }
 
@@ -34,17 +34,21 @@ void Broker::start() {
     addr.sin_addr.s_addr = INADDR_ANY;
     addr.sin_port        = htons(cfg_.broker_port);
 
-    if (::bind(listen_fd_, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) < 0) {
-        spdlog::error("[broker] bind() failed: {}", std::strerror(errno));
-        ::close(listen_fd_);
-        listen_fd_ = -1;
+    if (::bind(listen_fd_,
+               reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) < 0) {
+        spdlog::error("[broker] bind(): {}", strerror(errno));
+        ::close(listen_fd_); listen_fd_ = -1;
         return;
     }
-    ::listen(listen_fd_, 128);
+    ::listen(listen_fd_, 256);
 
+    thread_pool_   = std::make_unique<ThreadPool>(kDefaultThreads,
+                                                   kDefaultMaxQueue);
     running_       = true;
     accept_thread_ = std::thread(&Broker::accept_loop, this);
-    spdlog::info("[broker] Listening on port {}", cfg_.broker_port);
+
+    spdlog::info("[broker] Listening on port {} ({} worker threads)",
+                 cfg_.broker_port, kDefaultThreads);
 }
 
 void Broker::stop() {
@@ -55,39 +59,52 @@ void Broker::stop() {
         listen_fd_ = -1;
     }
     if (accept_thread_.joinable()) accept_thread_.join();
+    if (thread_pool_) thread_pool_->stop();
+}
+
+size_t Broker::active_connections() const {
+    return active_connections_.load();
 }
 
 void Broker::accept_loop() {
     while (running_) {
-        sockaddr_in client_addr{};
-        socklen_t   client_len = sizeof(client_addr);
+        sockaddr_in  client_addr{};
+        socklen_t    client_len = sizeof(client_addr);
         int client_fd = ::accept(listen_fd_,
                                   reinterpret_cast<sockaddr*>(&client_addr),
                                   &client_len);
         if (client_fd < 0) {
-            if (running_) spdlog::warn("[broker] accept() error: {}", std::strerror(errno));
+            if (running_) spdlog::debug("[broker] accept(): {}", strerror(errno));
             break;
         }
-        char ip[INET_ADDRSTRLEN];
+
+        char ip[INET_ADDRSTRLEN] = {};
         ::inet_ntop(AF_INET, &client_addr.sin_addr, ip, sizeof(ip));
-        spdlog::debug("[broker] Client connected: {}:{}", ip, ntohs(client_addr.sin_port));
+        uint16_t client_port = ntohs(client_addr.sin_port);
 
-        // Detach a worker thread per connection.
-        // TODO Phase 4: replace with thread pool.
-        std::thread([this, client_fd]{ handle_client(client_fd); }).detach();
-    }
-}
+        spdlog::debug("[broker] New connection from {}:{}", ip, client_port);
 
-void Broker::handle_client(int fd) {
-    // TODO Phase 4: implement FlexLM protocol framing.
-    // For now: read whatever the client sends, log it, close.
-    char buf[1024];
-    ssize_t n = ::recv(fd, buf, sizeof(buf) - 1, 0);
-    if (n > 0) {
-        buf[n] = '\0';
-        spdlog::debug("[broker] Received {} bytes from client fd={}", n, fd);
+        Connection::Context ctx;
+        ctx.pool        = pool_;
+        ctx.tracker     = tracker_;
+        ctx.client_ip   = ip;
+        ctx.client_port = client_port;
+
+        active_connections_++;
+        bool submitted = thread_pool_->submit(
+            [this, client_fd, ctx = std::move(ctx)]() mutable {
+                Connection conn(client_fd, std::move(ctx));
+                conn.run();
+                active_connections_--;
+            });
+
+        if (!submitted) {
+            spdlog::warn("[broker] Thread pool full, dropping connection from {}:{}",
+                         ip, client_port);
+            ::close(client_fd);
+            active_connections_--;
+        }
     }
-    ::close(fd);
 }
 
 } // namespace broker
