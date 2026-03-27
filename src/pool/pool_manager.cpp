@@ -4,6 +4,7 @@
 #include <spdlog/spdlog.h>
 #include <chrono>
 #include <map>
+#include <algorithm>
 
 namespace pool {
 
@@ -40,15 +41,18 @@ void PoolManager::poll_loop() {
 }
 
 void PoolManager::poll_server(BackendStatus& bs) {
-    auto features = LmutilWrapper::lmstat(bs.server.host, bs.server.port);
+    auto res = LmutilWrapper::lmstat(bs.server.host, bs.server.port);
 
-    if (features.empty()) {
+    if (!res.server_up) {
         bs.fail_streak++;
+        spdlog::debug("[pool] {}:{} poll failed (streak={}) — {}",
+                      bs.server.host, bs.server.port,
+                      bs.fail_streak, res.error_msg);
+
         if (bs.fail_streak >= cfg_.failover_threshold && bs.healthy) {
             bs.healthy = false;
-            spdlog::warn("[pool] Backend {}:{} marked UNHEALTHY (streak={})",
-                         bs.server.host, bs.server.port, bs.fail_streak);
-            // Record health event
+            spdlog::warn("[pool] Backend {}:{} marked UNHEALTHY — {}",
+                         bs.server.host, bs.server.port, res.error_msg);
             if (tracker_) {
                 tracker::UsageEvent ev;
                 ev.type         = tracker::EventType::SERVER_DOWN;
@@ -58,10 +62,14 @@ void PoolManager::poll_server(BackendStatus& bs) {
             }
         }
     } else {
-        bool was_down = !bs.healthy;
-        bs.healthy    = true;
+        bool was_down  = !bs.healthy;
+        bs.healthy     = true;
         bs.fail_streak = 0;
-        bs.features   = features;
+        bs.features    = res.features;
+
+        spdlog::debug("[pool] {}:{} OK — {} features",
+                      bs.server.host, bs.server.port, res.features.size());
+
         if (was_down) {
             spdlog::info("[pool] Backend {}:{} is back UP",
                          bs.server.host, bs.server.port);
@@ -76,7 +84,28 @@ void PoolManager::poll_server(BackendStatus& bs) {
     }
 }
 
-std::vector<FeatureCount> PoolManager::aggregated_features() const {
+void PoolManager::add_server(const common::ServerEntry& server) {
+    std::lock_guard<std::mutex> lk(mtx_);
+    // Deduplicate by host:port
+    for (const auto& bs : backends_)
+        if (bs.server.host == server.host && bs.server.port == server.port) return;
+    backends_.push_back({server, false, 0, {}});
+    spdlog::info("[pool] Added backend {}:{} ({})", server.host, server.port, server.name);
+}
+
+bool PoolManager::remove_server(const std::string& host, uint16_t port) {
+    std::lock_guard<std::mutex> lk(mtx_);
+    auto it = std::remove_if(backends_.begin(), backends_.end(),
+        [&](const BackendStatus& bs) {
+            return bs.server.host == host && bs.server.port == port;
+        });
+    if (it == backends_.end()) return false;
+    backends_.erase(it, backends_.end());
+    spdlog::info("[pool] Removed backend {}:{}", host, port);
+    return true;
+}
+
+
     std::lock_guard<std::mutex> lk(mtx_);
     std::map<std::string, FeatureCount> agg;
     for (const auto& bs : backends_) {

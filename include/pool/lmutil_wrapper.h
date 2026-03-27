@@ -5,16 +5,25 @@
 
 namespace pool {
 
+// Result of a single lmstat invocation
+struct LmstatResult {
+    bool                      server_up{false}; // false = could not contact server
+    std::string               error_msg;        // populated when server_up == false
+    std::vector<FeatureCount> features;
+};
+
 class LmutilWrapper {
 public:
     // Invokes: lmutil lmstat -a -c port@host
-    // Returns parsed feature list; empty vector on failure / timeout.
-    static std::vector<FeatureCount> lmstat(const std::string& host,
-                                            uint16_t port);
+    // Always returns a result; check result.server_up for success.
+    static LmstatResult lmstat(const std::string& host, uint16_t port);
 
-    // Parse raw lmstat output text into FeatureCount entries.
-    // Exposed separately to allow unit testing without invoking lmutil.
-    static std::vector<FeatureCount> parse_lmstat(const std::string& output);
+    // Parse raw lmstat output text into an LmstatResult.
+    // Exposed for unit testing without invoking lmutil.
+    static LmstatResult parse_lmstat(const std::string& output);
+
+    // Returns true if the output contains known server-down indicators
+    static bool is_server_down(const std::string& output);
 };
 
 } // namespace pool

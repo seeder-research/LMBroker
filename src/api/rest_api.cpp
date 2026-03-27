@@ -60,9 +60,12 @@ void RestApi::start() {
         for (const auto& f : pool_->aggregated_features()) {
             arr.push_back({
                 {"feature",   f.feature},
+                {"vendor",    f.vendor},
                 {"total",     f.total},
                 {"in_use",    f.in_use},
-                {"available", f.available}
+                {"available", f.available},
+                {"queued",    f.queued},
+                {"uncounted", f.uncounted}
             });
         }
         res.set_content(arr.dump(2), "application/json");
@@ -92,9 +95,12 @@ void RestApi::start() {
                 if (f.feature == name) {
                     json obj = {
                         {"feature",   f.feature},
+                        {"vendor",    f.vendor},
                         {"total",     f.total},
                         {"in_use",    f.in_use},
-                        {"available", f.available}
+                        {"available", f.available},
+                        {"queued",    f.queued},
+                        {"uncounted", f.uncounted}
                     };
                     res.set_content(obj.dump(2), "application/json");
                     return;
@@ -102,6 +108,37 @@ void RestApi::start() {
             }
             res.status = 404;
             res.set_content(R"({"error":"feature not found"})", "application/json");
+        });
+
+    // ── POST /api/v1/servers  — add a backend server dynamically ─────────
+    svr.Post("/api/v1/servers",
+        [this](const httplib::Request& req, httplib::Response& res) {
+            try {
+                auto body = json::parse(req.body);
+                common::ServerEntry entry;
+                entry.host = body.at("host").get<std::string>();
+                entry.port = body.value("port", 27000);
+                entry.name = body.value("name", "");
+                pool_->add_server(entry);
+                res.status = 201;
+                res.set_content(R"({"status":"added"})", "application/json");
+            } catch (const std::exception& e) {
+                res.status = 400;
+                res.set_content(json{{"error", e.what()}}.dump(), "application/json");
+            }
+        });
+
+    // ── DELETE /api/v1/servers/:host/:port ────────────────────────────────
+    svr.Delete(R"(/api/v1/servers/([^/]+)/(\d+))",
+        [this](const httplib::Request& req, httplib::Response& res) {
+            std::string host = req.matches[1];
+            uint16_t    port = static_cast<uint16_t>(std::stoi(req.matches[2]));
+            if (pool_->remove_server(host, port)) {
+                res.set_content(R"({"status":"removed"})", "application/json");
+            } else {
+                res.status = 404;
+                res.set_content(R"({"error":"server not found"})", "application/json");
+            }
         });
 
     thread_ = std::thread(&RestApi::serve, this);
