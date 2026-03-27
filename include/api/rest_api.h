@@ -5,6 +5,8 @@
 #include "common/config.h"
 #include "pool/pool_manager.h"
 #include "tracker/usage_tracker.h"
+#include "api/metrics.h"
+#include "api/alerter.h"
 
 namespace api {
 
@@ -12,7 +14,8 @@ class RestApi {
 public:
     RestApi(const common::Config& cfg,
             std::shared_ptr<pool::PoolManager> pool,
-            std::shared_ptr<tracker::UsageTracker> tracker);
+            std::shared_ptr<tracker::UsageTracker> tracker,
+            std::shared_ptr<Alerter> alerter = nullptr);
     ~RestApi();
 
     void start();
@@ -25,6 +28,8 @@ private:
     common::Config                          cfg_;
     std::shared_ptr<pool::PoolManager>      pool_;
     std::shared_ptr<tracker::UsageTracker>  tracker_;
+    std::shared_ptr<Alerter>               alerter_;
+    std::unique_ptr<MetricsRenderer>        metrics_;
     std::thread                             thread_;
     std::atomic<bool>                       running_{false};
 

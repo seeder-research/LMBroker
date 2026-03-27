@@ -184,7 +184,53 @@ Fixed-size pool (default 32 threads, queue depth 2048). When the queue is
 full, the *oldest* pending task is dropped (shed load, never block accept).
 `submit()` returns false when the pool is stopping.
 
+## Phase 5 — Alerting, Metrics & Admin
+
+### Prometheus metrics (`src/api/metrics.cpp`)
+
+Endpoint: `GET /metrics` (no auth required — standard Prometheus convention)
+
+Content-Type: `text/plain; version=0.0.4`
+
+| Metric | Type | Labels | Description |
+|---|---|---|---|
+| `flexlm_broker_info` | gauge | `version` | Build info, always 1 |
+| `flexlm_feature_total` | gauge | `feature,vendor` | Total licensed seats |
+| `flexlm_feature_in_use` | gauge | `feature,vendor` | Seats in use |
+| `flexlm_feature_available` | gauge | `feature,vendor` | Seats available |
+| `flexlm_feature_queued` | gauge | `feature,vendor` | Queued requests |
+| `flexlm_backend_healthy` | gauge | `host,port,name` | 1=up, 0=down |
+| `flexlm_backend_fail_streak` | gauge | `host,port,name` | Consecutive failures |
+| `flexlm_denials_24h` | gauge | `feature` | Denials in last 24 h (DB) |
+| `flexlm_active_checkouts_total` | gauge | — | Open checkouts (DB) |
+
+### Alerter (`src/api/alerter.cpp`)
+
+Background thread checks every 30 seconds for:
+
+| Alert type | Trigger |
+|---|---|
+| `SERVER_DOWN` | Backend transitions from healthy → unhealthy |
+| `SERVER_UP` | Backend transitions from unhealthy → healthy |
+| `POOL_EXHAUSTED` | Feature `in_use/total >= pool_exhaustion_pct` |
+| `POOL_RECOVERED` | Feature drops back below threshold |
+| `DENIAL_SPIKE` | 24-h denial average ≥ `denial_spike_threshold` /min |
+
+Alerts are delivered via HTTP POST (JSON body) to `webhook_url`.
+Cooldown is enforced per `(alert_type, subject)` key to prevent storms.
+`set_sender()` allows injection of a custom delivery function for testing.
+
+### Admin endpoints
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/v1/admin/pool` | Full per-backend feature detail |
+| `POST` | `/api/v1/admin/poll` | Trigger immediate status response |
+| `GET` | `/api/v1/admin/alerts/suppressed` | List cooldown-suppressed keys |
+| `POST` | `/api/v1/admin/alerts/test` | Fire a test alert |
+
 ## REST API Reference
+
 
 
 All endpoints return `Content-Type: application/json`.  

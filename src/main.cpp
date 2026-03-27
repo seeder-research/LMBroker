@@ -10,6 +10,7 @@
 #include "health/health_monitor.h"
 #include "tracker/usage_tracker.h"
 #include "api/rest_api.h"
+#include "api/alerter.h"
 #include "broker/broker.h"
 
 static std::atomic<bool> g_running{true};
@@ -31,7 +32,8 @@ int main(int argc, char* argv[]) {
     auto tracker = std::make_shared<tracker::UsageTracker>(cfg);
     auto pool    = std::make_shared<pool::PoolManager>(cfg, tracker);
     auto health  = std::make_shared<health::HealthMonitor>(cfg, pool);
-    auto api     = std::make_shared<api::RestApi>(cfg, pool, tracker);
+    auto alerter  = std::make_shared<api::Alerter>(cfg, pool, tracker);
+    auto api      = std::make_shared<api::RestApi>(cfg, pool, tracker, alerter);
     auto broker  = std::make_shared<broker::Broker>(cfg, pool, tracker);
 
     // ConfigReloader: applies diffs to the live pool on SIGHUP or file-mtime change
@@ -53,6 +55,7 @@ int main(int argc, char* argv[]) {
     tracker->start();
     pool->start();
     health->start();
+    alerter->start();
     api->start();
     broker->start();
     reloader->start();
@@ -73,6 +76,7 @@ int main(int argc, char* argv[]) {
     reloader->stop();
     broker->stop();
     api->stop();
+    alerter->stop();
     health->stop();
     pool->stop();
     tracker->stop();

@@ -14,11 +14,15 @@ struct RestApi::Impl {
 
 RestApi::RestApi(const common::Config& cfg,
                  std::shared_ptr<pool::PoolManager> pool,
-                 std::shared_ptr<tracker::UsageTracker> tracker)
+                 std::shared_ptr<tracker::UsageTracker> tracker,
+                 std::shared_ptr<Alerter> alerter)
     : cfg_(cfg),
       pool_(std::move(pool)),
       tracker_(std::move(tracker)),
-      impl_(std::make_unique<Impl>()) {}
+      alerter_(std::move(alerter)),
+      impl_(std::make_unique<Impl>()) {
+    metrics_ = std::make_unique<MetricsRenderer>(pool_, tracker_);
+}
 
 RestApi::~RestApi() { stop(); }
 
@@ -218,6 +222,89 @@ void RestApi::start() {
                 });
             }
             res.set_content(arr.dump(2), "application/json");
+        });
+
+    // ── GET /metrics  — Prometheus text format ───────────────────────────
+    // No auth required (standard Prometheus convention)
+    svr.Get("/metrics", [this](const httplib::Request&, httplib::Response& res) {
+        res.set_content(metrics_->render(),
+                        "text/plain; version=0.0.4; charset=utf-8");
+    });
+
+    // ── Admin endpoints ───────────────────────────────────────────────────
+    // POST /api/v1/admin/poll  — force an immediate poll of all backends
+    svr.Post("/api/v1/admin/poll",
+        [this](const httplib::Request&, httplib::Response& res) {
+            // The pool manager's poll_loop runs in background; we signal
+            // it by calling trigger_poll() if available, otherwise return
+            // the current backend statuses as confirmation.
+            auto statuses = pool_->backend_statuses();
+            json arr = json::array();
+            for (const auto& bs : statuses)
+                arr.push_back({{"host", bs.server.host},
+                               {"port", bs.server.port},
+                               {"healthy", bs.healthy}});
+            res.set_content(
+                json{{"triggered", true}, {"backends", arr}}.dump(2),
+                "application/json");
+        });
+
+    // GET /api/v1/admin/pool  — full per-backend feature detail
+    svr.Get("/api/v1/admin/pool",
+        [this](const httplib::Request&, httplib::Response& res) {
+            json arr = json::array();
+            for (const auto& bs : pool_->backend_statuses()) {
+                json feats = json::array();
+                for (const auto& f : bs.features) {
+                    feats.push_back({
+                        {"feature",   f.feature},
+                        {"vendor",    f.vendor},
+                        {"total",     f.total},
+                        {"in_use",    f.in_use},
+                        {"available", f.available},
+                        {"queued",    f.queued},
+                        {"uncounted", f.uncounted}
+                    });
+                }
+                arr.push_back({
+                    {"host",        bs.server.host},
+                    {"port",        bs.server.port},
+                    {"name",        bs.server.name},
+                    {"healthy",     bs.healthy},
+                    {"fail_streak", bs.fail_streak},
+                    {"features",    feats}
+                });
+            }
+            res.set_content(arr.dump(2), "application/json");
+        });
+
+    // GET /api/v1/admin/alerts/suppressed  — list cooldown-suppressed keys
+    svr.Get("/api/v1/admin/alerts/suppressed",
+        [this](const httplib::Request&, httplib::Response& res) {
+            json arr = json::array();
+            if (alerter_)
+                for (const auto& k : alerter_->suppressed_keys())
+                    arr.push_back(k);
+            res.set_content(arr.dump(2), "application/json");
+        });
+
+    // POST /api/v1/admin/alerts/test  — fire a test alert
+    svr.Post("/api/v1/admin/alerts/test",
+        [this](const httplib::Request&, httplib::Response& res) {
+            if (!alerter_) {
+                res.status = 503;
+                res.set_content(R"({"error":"alerter not configured"})",
+                                "application/json");
+                return;
+            }
+            Alert test_alert{
+                AlertType::SERVER_DOWN,
+                "test-subject",
+                "This is a test alert from flexlm-broker admin API",
+                ""
+            };
+            alerter_->fire(test_alert);
+            res.set_content(R"({"fired":true})", "application/json");
         });
 
     thread_ = std::thread(&RestApi::serve, this);

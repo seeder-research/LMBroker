@@ -42,6 +42,15 @@ struct Config {
     std::string log_level{"info"};
     std::string log_file;
 
+    // Alerting
+    struct AlertConfig {
+        std::string webhook_url;                  // HTTP POST target; empty = disabled
+        std::string webhook_secret;               // sent as X-Webhook-Secret header
+        int         cooldown_sec{300};            // min seconds between same-type alerts
+        int         denial_spike_threshold{10};   // denials/min threshold
+        float       pool_exhaustion_pct{0.95f};   // in_use/total fraction threshold
+    } alerts;
+
     static Config load(const std::string& path);
 };
 

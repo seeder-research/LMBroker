@@ -63,6 +63,12 @@ Config Config::load(const std::string& path) {
         } else if (section == "logging") {
             if (key == "level") cfg.log_level = val;
             else if (key == "file") cfg.log_file = val;
+        } else if (section == "alerts") {
+            if (key == "webhook_url")              cfg.alerts.webhook_url = val;
+            else if (key == "webhook_secret")      cfg.alerts.webhook_secret = val;
+            else if (key == "cooldown_sec")        cfg.alerts.cooldown_sec = std::stoi(val);
+            else if (key == "denial_spike_threshold") cfg.alerts.denial_spike_threshold = std::stoi(val);
+            else if (key == "pool_exhaustion_pct") cfg.alerts.pool_exhaustion_pct = std::stof(val);
         } else if (in_server_section) {
             if (key == "host") current_server.host = val;
             else if (key == "port") current_server.port = static_cast<uint16_t>(std::stoi(val));

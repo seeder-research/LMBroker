@@ -135,6 +135,56 @@ curl -H "Authorization: Bearer changeme" http://localhost:8080/api/v1/features
 
 ---
 
+## Prometheus / Grafana
+
+Scrape `GET /metrics` (no auth needed):
+
+```yaml
+# prometheus.yml
+scrape_configs:
+  - job_name: flexlm_broker
+    static_configs:
+      - targets: ['localhost:8080']
+    metrics_path: /metrics
+```
+
+Key dashboards to build in Grafana:
+- `flexlm_feature_in_use / flexlm_feature_total` — utilisation gauge
+- `flexlm_denials_24h` — bar chart per feature
+- `flexlm_backend_healthy` — backend status table
+- `flexlm_active_checkouts_total` — live open checkouts
+
+## Alerting
+
+Configure in `broker.conf`:
+
+```ini
+[alerts]
+webhook_url            = https://hooks.slack.com/services/XXX/YYY/ZZZ
+webhook_secret         = my-hmac-secret
+cooldown_sec           = 300
+denial_spike_threshold = 10
+pool_exhaustion_pct    = 0.95
+```
+
+Webhook payload (JSON):
+```json
+{
+  "type":      "POOL_EXHAUSTED",
+  "subject":   "MATLAB",
+  "message":   "MATLAB at 98% utilisation (49/50)",
+  "timestamp": "2026-03-27T10:00:00Z"
+}
+```
+
+Test the webhook without waiting for a real alert:
+```bash
+curl -X POST -H "Authorization: Bearer <token>" \
+  http://localhost:8080/api/v1/admin/alerts/test
+```
+
+---
+
 ## Running Tests
 
 ```bash
@@ -190,6 +240,6 @@ flexlm-broker/
 | 2     | ✅ Complete  | Dynamic config reload (SIGHUP + mtime watcher)      |
 | 3     | ✅ Complete  | Full PostgreSQL tracking (checkout/checkin/denial)  |
 | 4     | ✅ Complete  | FlexLM TCP protocol framing, connection state machine, thread pool |
-| 5     | 🔲 Planned   | Alerting webhooks, Prometheus metrics endpoint      |
+| 5     | ✅ Complete  | Alerting webhooks, Prometheus metrics, admin API    |
 
 See `docs/architecture.md` for detailed design notes.

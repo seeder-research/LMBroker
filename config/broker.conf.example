@@ -45,3 +45,20 @@ connstr = host=localhost port=5432 dbname=flexlm user=broker password=secret ssl
 level = info
 # Omit 'file' to log to stdout
 # file = /var/log/flexlm-broker/broker.log
+
+[alerts]
+# Webhook URL to POST JSON alerts to (e.g. Slack, PagerDuty, custom endpoint)
+# Leave empty to disable alerting.
+# webhook_url = https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK
+
+# HMAC secret added as X-Webhook-Secret header for receiver verification
+# webhook_secret = changeme
+
+# Minimum seconds between repeated alerts of the same type (default: 300)
+cooldown_sec = 300
+
+# Fire DENIAL_SPIKE alert when average denials/min over 24h reaches this value
+denial_spike_threshold = 10
+
+# Fire POOL_EXHAUSTED alert when in_use/total >= this fraction (default: 0.95)
+pool_exhaustion_pct = 0.95
