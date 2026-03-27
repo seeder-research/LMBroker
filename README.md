@@ -91,10 +91,16 @@ Authorization: Bearer <token>
 
 | Endpoint                    | Auth | Description                      |
 |-----------------------------|------|----------------------------------|
-| `GET /api/v1/health`        | No   | Broker liveness                  |
-| `GET /api/v1/features`      | Yes  | Aggregated license pool          |
-| `GET /api/v1/features/:name`| Yes  | Single feature detail            |
-| `GET /api/v1/servers`       | Yes  | Backend server health            |
+| `GET /api/v1/health`             | No  | Broker liveness                       |
+| `GET /api/v1/features`           | Yes | Aggregated live pool (from lmstat)    |
+| `GET /api/v1/features/:name`     | Yes | Single feature detail                 |
+| `GET /api/v1/servers`            | Yes | Backend server health                 |
+| `POST /api/v1/servers`           | Yes | Add backend server at runtime         |
+| `DELETE /api/v1/servers/:h/:p`   | Yes | Remove backend server at runtime      |
+| `GET /api/v1/utilisation`        | Yes | DB-backed utilisation (per poll)      |
+| `GET /api/v1/denials`            | Yes | Denial counts per feature (24 h)      |
+| `GET /api/v1/checkouts/active`   | Yes | All currently open checkouts          |
+| `GET /api/v1/health/events`      | Yes | Recent server UP/DOWN events          |
 
 ### Example
 ```bash
@@ -162,7 +168,7 @@ flexlm-broker/
 | 0     | ✅ Complete  | Scaffold — all components stubbed and wired         |
 | 1     | 🔲 Next      | lmutil output parser + pool polling tests           |
 | 2     | ✅ Complete  | Dynamic config reload (SIGHUP + mtime watcher)      |
-| 3     | 🔲 Planned   | Full PostgreSQL tracking (checkout/checkin/denial)  |
+| 3     | ✅ Complete  | Full PostgreSQL tracking (checkout/checkin/denial)  |
 | 4     | 🔲 Planned   | FlexLM TCP protocol framing                         |
 | 5     | 🔲 Planned   | Alerting webhooks, Prometheus metrics endpoint      |
 

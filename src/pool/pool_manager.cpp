@@ -70,6 +70,22 @@ void PoolManager::poll_server(BackendStatus& bs) {
         spdlog::debug("[pool] {}:{} OK — {} features",
                       bs.server.host, bs.server.port, res.features.size());
 
+        // Emit a FEATURE_POLL event for every feature on this backend
+        if (tracker_) {
+            for (const auto& f : res.features) {
+                tracker::UsageEvent ev;
+                ev.type         = tracker::EventType::FEATURE_POLL;
+                ev.feature      = f.feature;
+                ev.vendor       = f.vendor;
+                ev.backend_host = bs.server.host;
+                ev.backend_port = bs.server.port;
+                ev.total        = f.total;
+                ev.in_use       = f.in_use;
+                ev.queued       = f.queued;
+                tracker_->record(std::move(ev));
+            }
+        }
+
         if (was_down) {
             spdlog::info("[pool] Backend {}:{} is back UP",
                          bs.server.host, bs.server.port);

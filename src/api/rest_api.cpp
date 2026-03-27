@@ -141,6 +141,75 @@ void RestApi::start() {
             }
         });
 
+    // ── GET /api/v1/utilisation ──────────────────────────────────────────
+    svr.Get("/api/v1/utilisation",
+        [this](const httplib::Request&, httplib::Response& res) {
+            json arr = json::array();
+            for (const auto& r : tracker_->query_utilisation()) {
+                arr.push_back({
+                    {"feature",     r.feature},
+                    {"total",       r.total},
+                    {"in_use",      r.in_use},
+                    {"available",   r.available},
+                    {"queued",      r.queued},
+                    {"last_polled", r.last_polled}
+                });
+            }
+            res.set_content(arr.dump(2), "application/json");
+        });
+
+    // ── GET /api/v1/denials ───────────────────────────────────────────────
+    svr.Get("/api/v1/denials",
+        [this](const httplib::Request&, httplib::Response& res) {
+            json arr = json::array();
+            for (const auto& r : tracker_->query_denials_24h()) {
+                arr.push_back({
+                    {"feature",      r.feature},
+                    {"denials_24h",  r.denials_24h}
+                });
+            }
+            res.set_content(arr.dump(2), "application/json");
+        });
+
+    // ── GET /api/v1/checkouts/active ──────────────────────────────────────
+    svr.Get("/api/v1/checkouts/active",
+        [this](const httplib::Request&, httplib::Response& res) {
+            json arr = json::array();
+            for (const auto& r : tracker_->query_active_checkouts()) {
+                arr.push_back({
+                    {"id",              r.id},
+                    {"feature",         r.feature},
+                    {"username",        r.username},
+                    {"client_host",     r.client_host},
+                    {"backend_host",    r.backend_host},
+                    {"backend_port",    r.backend_port},
+                    {"checked_out_at",  r.checked_out_at},
+                    {"duration_sec",    r.duration_sec}
+                });
+            }
+            res.set_content(arr.dump(2), "application/json");
+        });
+
+    // ── GET /api/v1/health/events ─────────────────────────────────────────
+    svr.Get("/api/v1/health/events",
+        [this](const httplib::Request& req, httplib::Response& res) {
+            int limit = 50;
+            if (req.has_param("limit")) {
+                try { limit = std::stoi(req.get_param_value("limit")); }
+                catch (...) {}
+            }
+            json arr = json::array();
+            for (const auto& r : tracker_->query_health_events(limit)) {
+                arr.push_back({
+                    {"host",        r.host},
+                    {"port",        r.port},
+                    {"event",       r.event},
+                    {"occurred_at", r.occurred_at}
+                });
+            }
+            res.set_content(arr.dump(2), "application/json");
+        });
+
     thread_ = std::thread(&RestApi::serve, this);
     spdlog::info("[api] REST API listening on {}:{}", cfg_.api_host, cfg_.api_port);
 }
