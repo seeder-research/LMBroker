@@ -142,3 +142,15 @@ std::vector<BackendStatus> PoolManager::backend_statuses() const {
 }
 
 } // namespace pool
+
+void PoolManager::set_poll_interval(int seconds) {
+    std::lock_guard<std::mutex> lk(mtx_);
+    cfg_.poll_interval_sec = seconds;
+    spdlog::info("[pool] poll_interval updated to {}s", seconds);
+}
+
+void PoolManager::set_failover_threshold(int threshold) {
+    std::lock_guard<std::mutex> lk(mtx_);
+    cfg_.failover_threshold = threshold;
+    spdlog::info("[pool] failover_threshold updated to {}", threshold);
+}

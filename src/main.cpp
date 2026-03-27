@@ -4,6 +4,7 @@
 #include <thread>
 #include <chrono>
 #include "common/config.h"
+#include "common/config_reloader.h"
 #include "common/logger.h"
 #include "pool/pool_manager.h"
 #include "health/health_monitor.h"
@@ -11,13 +12,16 @@
 #include "api/rest_api.h"
 #include "broker/broker.h"
 
-std::atomic<bool> g_running{true};
+static std::atomic<bool> g_running{true};
+static std::atomic<bool> g_reload_requested{false};
 
-void signal_handler(int) { g_running = false; }
+void on_sigterm(int) { g_running = false; }
+void on_sighup(int)  { g_reload_requested = true; }
 
 int main(int argc, char* argv[]) {
-    std::signal(SIGINT,  signal_handler);
-    std::signal(SIGTERM, signal_handler);
+    std::signal(SIGINT,  on_sigterm);
+    std::signal(SIGTERM, on_sigterm);
+    std::signal(SIGHUP,  on_sighup);
 
     const std::string config_path =
         (argc > 1) ? argv[1] : "/etc/flexlm-broker/broker.conf";
@@ -30,18 +34,43 @@ int main(int argc, char* argv[]) {
     auto api     = std::make_shared<api::RestApi>(cfg, pool, tracker);
     auto broker  = std::make_shared<broker::Broker>(cfg, pool, tracker);
 
+    // ConfigReloader: applies diffs to the live pool on SIGHUP or file-mtime change
+    auto reloader = std::make_shared<common::ConfigReloader>(
+        config_path, cfg,
+        [&pool](const common::Config& new_cfg, const common::ConfigDiff& diff) {
+            for (const auto& s : diff.added)
+                pool->add_server(s);
+            for (const auto& s : diff.removed)
+                pool->remove_server(s.host, s.port);
+            if (diff.poll_interval_changed)
+                pool->set_poll_interval(new_cfg.poll_interval_sec);
+            if (diff.failover_threshold_changed)
+                pool->set_failover_threshold(new_cfg.failover_threshold);
+        },
+        /* watch_interval_sec = */ 15
+    );
+
     tracker->start();
     pool->start();
     health->start();
     api->start();
     broker->start();
+    reloader->start();
 
     logger->info("flexlm-broker started (pid {})", getpid());
+    logger->info("Send SIGHUP or edit {} to reload config", config_path);
 
-    while (g_running)
+    while (g_running) {
         std::this_thread::sleep_for(std::chrono::milliseconds(200));
 
+        // Forward SIGHUP to the reloader (signal handler only sets atomic flag)
+        if (g_reload_requested.exchange(false)) {
+            reloader->trigger_reload();
+        }
+    }
+
     logger->info("Shutting down...");
+    reloader->stop();
     broker->stop();
     api->stop();
     health->stop();

@@ -13,12 +13,12 @@ namespace pool {
 
 struct FeatureCount {
     std::string feature;
-    std::string vendor;     // vendor daemon name (from lmstat output)
+    std::string vendor;
     int         total{0};
     int         in_use{0};
     int         available{0};
-    int         queued{0};  // licenses currently queued/waiting
-    bool        uncounted{false}; // true = no seat limit (floating uncounted)
+    int         queued{0};
+    bool        uncounted{false};
 };
 
 struct BackendStatus {
@@ -37,11 +37,13 @@ public:
     void start();
     void stop();
 
-    // Dynamically add a backend server (safe to call while running)
+    // Dynamic pool management — safe to call while running
     void add_server(const common::ServerEntry& server);
-
-    // Remove a backend server by host:port (safe to call while running)
     bool remove_server(const std::string& host, uint16_t port);
+
+    // Runtime tuning — safe to call while running
+    void set_poll_interval(int seconds);
+    void set_failover_threshold(int threshold);
 
     // Aggregated feature counts across all healthy backends
     std::vector<FeatureCount> aggregated_features() const;

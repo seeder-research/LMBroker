@@ -77,3 +77,34 @@ Config Config::load(const std::string& path) {
 }
 
 } // namespace common
+
+namespace common {
+
+ConfigDiff diff_configs(const Config& old_cfg, const Config& new_cfg) {
+    ConfigDiff diff;
+
+    // Servers added in new_cfg
+    for (const auto& ns : new_cfg.servers) {
+        bool found = false;
+        for (const auto& os : old_cfg.servers)
+            if (ns.same_endpoint(os)) { found = true; break; }
+        if (!found) diff.added.push_back(ns);
+    }
+
+    // Servers removed in new_cfg
+    for (const auto& os : old_cfg.servers) {
+        bool found = false;
+        for (const auto& ns : new_cfg.servers)
+            if (os.same_endpoint(ns)) { found = true; break; }
+        if (!found) diff.removed.push_back(os);
+    }
+
+    diff.poll_interval_changed =
+        (old_cfg.poll_interval_sec != new_cfg.poll_interval_sec);
+    diff.failover_threshold_changed =
+        (old_cfg.failover_threshold != new_cfg.failover_threshold);
+
+    return diff;
+}
+
+} // namespace common

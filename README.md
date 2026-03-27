@@ -161,7 +161,7 @@ flexlm-broker/
 |-------|-------------|-----------------------------------------------------|
 | 0     | ✅ Complete  | Scaffold — all components stubbed and wired         |
 | 1     | 🔲 Next      | lmutil output parser + pool polling tests           |
-| 2     | 🔲 Planned   | Dynamic config reload (SIGHUP)                      |
+| 2     | ✅ Complete  | Dynamic config reload (SIGHUP + mtime watcher)      |
 | 3     | 🔲 Planned   | Full PostgreSQL tracking (checkout/checkin/denial)  |
 | 4     | 🔲 Planned   | FlexLM TCP protocol framing                         |
 | 5     | 🔲 Planned   | Alerting webhooks, Prometheus metrics endpoint      |

@@ -167,7 +167,7 @@ Authenticated endpoints require: `Authorization: Bearer <token>`
 | Phase | Status      | Description                                       |
 |-------|-------------|---------------------------------------------------|
 | 0     | ✅ Complete  | Project scaffold                                  |
-| 1     | 🔲 Next      | lmutil parser + pool polling integration tests    |
+| 1     | ✅ Complete  | lmutil parser + pool polling integration tests    |
 | 2     | 🔲 Planned   | Config file parser with dynamic server reload     |
 | 3     | 🔲 Planned   | Full PostgreSQL tracking (checkout/checkin/denial)|
 | 4     | 🔲 Planned   | FlexLM protocol broker (TCP framing)              |
