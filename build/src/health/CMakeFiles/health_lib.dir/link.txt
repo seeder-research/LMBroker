@@ -1,2 +1,0 @@
-/usr/bin/ar qc libhealth_lib.a CMakeFiles/health_lib.dir/health_monitor.cpp.o
-/usr/bin/ranlib libhealth_lib.a
