@@ -24,6 +24,7 @@ struct Config {
     // Broker listener
     uint16_t    broker_port{27000};
     std::string broker_host{"0.0.0.0"};
+    int         broker_threads{32};
 
     // REST API
     uint16_t    api_port{8080};
@@ -32,8 +33,9 @@ struct Config {
 
     // Backend pool
     std::vector<ServerEntry> servers;
-    int poll_interval_sec{30};
-    int failover_threshold{3};
+    int         poll_interval_sec{30};
+    int         failover_threshold{3};
+    std::string lmutil_path{"lmutil"};
 
     // PostgreSQL
     std::string db_connstr;

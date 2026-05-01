@@ -42,13 +42,13 @@ void Broker::start() {
     }
     ::listen(listen_fd_, 256);
 
-    thread_pool_   = std::make_unique<ThreadPool>(kDefaultThreads,
+    thread_pool_   = std::make_unique<ThreadPool>(cfg_.broker_threads,
                                                    kDefaultMaxQueue);
     running_       = true;
     accept_thread_ = std::thread(&Broker::accept_loop, this);
 
     spdlog::info("[broker] Listening on port {} ({} worker threads)",
-                 cfg_.broker_port, kDefaultThreads);
+                 cfg_.broker_port, cfg_.broker_threads);
 }
 
 void Broker::stop() {

@@ -120,94 +120,93 @@ void Connection::handle_checkout(const Packet& pkt) {
         return;
     }
     auto msg = CheckoutMsg::decode(pkt);
-    spdlog::info("[conn] CHECKOUT feature={} user={} host={}",
-                 msg.feature, msg.username, msg.client_host);
+    spdlog::info("[conn] CHECKOUT feature={} count={} user={} host={}",
+                 msg.feature, msg.count, msg.username, msg.client_host);
 
     // Override with negotiated identity if client didn't send it
     if (msg.username.empty())    msg.username    = client_username_;
     if (msg.client_host.empty()) msg.client_host = client_host_;
 
-    const common::ServerEntry* backend =
-        ctx_.pool->select_backend(msg.feature);
+    // Try backends in turn until one grants the checkout or all are exhausted.
+    // Backends are skipped if they don't have enough seats (per last poll) or
+    // if they were already tried and refused.
+    std::vector<std::string> tried;
+    CheckoutAckMsg final_ack;
+    final_ack.granted       = false;
+    final_ack.denial_reason = "no licenses available";
 
-    if (!backend) {
-        // No seats available — send denial
-        spdlog::warn("[conn] CHECKOUT denied: no seats for {}",
-                     msg.feature);
-        if (ctx_.tracker) {
-            tracker::UsageEvent ev;
-            ev.type          = tracker::EventType::DENIAL;
-            ev.feature       = msg.feature;
-            ev.user          = msg.username;
-            ev.client_host   = msg.client_host;
-            ev.denial_reason = "no licenses available";
-            ctx_.tracker->record(std::move(ev));
+    while (true) {
+        const common::ServerEntry* backend =
+            ctx_.pool->select_backend(msg.feature, static_cast<int>(msg.count), tried);
+
+        if (!backend) {
+            // No more backends to try
+            if (tried.empty())
+                spdlog::warn("[conn] CHECKOUT denied: no seats for {} (count={})",
+                             msg.feature, msg.count);
+            else
+                spdlog::warn("[conn] CHECKOUT denied: all {} backend(s) refused {} (count={})",
+                             tried.size(), msg.feature, msg.count);
+            break;
         }
-        CheckoutAckMsg ack;
-        ack.granted       = false;
-        ack.denial_reason = "no licenses available";
-        send(ack.encode());
-        return;
-    }
 
-    // Forward to backend
-    int bfd = connect_backend(*backend);
-    if (bfd < 0) {
-        CheckoutAckMsg ack;
-        ack.granted       = false;
-        ack.denial_reason = "backend unavailable";
-        send(ack.encode());
-        return;
-    }
+        std::string key = backend->host + ":" + std::to_string(backend->port);
+        tried.push_back(key);
 
-    auto resp = proxy_to_backend(bfd, msg.encode());
-    ::close(bfd);
-
-    if (!resp) {
-        send_error(4, "Backend did not respond to CHECKOUT");
-        return;
-    }
-
-    // Parse backend response
-    auto backend_ack = CheckoutAckMsg::decode(*resp);
-
-    if (backend_ack.granted) {
-        // Assign our own handle so we can track it
-        uint32_t handle = next_handle_.fetch_add(1);
-        backend_ack.handle = handle;
-
-        checkouts_.push_back({msg.feature, handle,
-                              backend->host, backend->port});
-
-        if (ctx_.tracker) {
-            tracker::UsageEvent ev;
-            ev.type         = tracker::EventType::CHECKOUT;
-            ev.feature      = msg.feature;
-            ev.user         = msg.username;
-            ev.client_host  = msg.client_host;
-            ev.backend_host = backend->host;
-            ev.backend_port = backend->port;
-            ctx_.tracker->record(std::move(ev));
+        int bfd = connect_backend(*backend);
+        if (bfd < 0) {
+            spdlog::debug("[conn] Could not connect to backend {}, trying next", key);
+            continue;
         }
-        spdlog::info("[conn] CHECKOUT granted feature={} handle={} backend={}:{}",
-                     msg.feature, handle, backend->host, backend->port);
-    } else {
-        if (ctx_.tracker) {
-            tracker::UsageEvent ev;
-            ev.type          = tracker::EventType::DENIAL;
-            ev.feature       = msg.feature;
-            ev.user          = msg.username;
-            ev.client_host   = msg.client_host;
-            ev.backend_host  = backend->host;
-            ev.backend_port  = backend->port;
-            ev.denial_reason = backend_ack.denial_reason;
-            ctx_.tracker->record(std::move(ev));
+
+        auto resp = proxy_to_backend(bfd, msg.encode());
+        ::close(bfd);
+
+        if (!resp) {
+            spdlog::debug("[conn] No response from backend {}, trying next", key);
+            continue;
         }
-        spdlog::warn("[conn] CHECKOUT denied by backend: {}",
-                     backend_ack.denial_reason);
+
+        auto backend_ack = CheckoutAckMsg::decode(*resp);
+
+        if (backend_ack.granted) {
+            uint32_t handle = next_handle_.fetch_add(1);
+            backend_ack.handle = handle;
+            checkouts_.push_back({msg.feature, handle,
+                                  backend->host, backend->port});
+            if (ctx_.tracker) {
+                tracker::UsageEvent ev;
+                ev.type         = tracker::EventType::CHECKOUT;
+                ev.feature      = msg.feature;
+                ev.user         = msg.username;
+                ev.client_host  = msg.client_host;
+                ev.backend_host = backend->host;
+                ev.backend_port = backend->port;
+                ctx_.tracker->record(std::move(ev));
+            }
+            spdlog::info("[conn] CHECKOUT granted feature={} count={} handle={} backend={}",
+                         msg.feature, msg.count, handle, key);
+            send(backend_ack.encode());
+            return;
+        }
+
+        // Backend refused — record denial and try the next backend
+        spdlog::debug("[conn] Backend {} refused {} ({}), trying next",
+                      key, msg.feature, backend_ack.denial_reason);
+        final_ack.denial_reason = backend_ack.denial_reason;
     }
 
-    send(backend_ack.encode());
+    // All backends exhausted without a grant
+    if (ctx_.tracker) {
+        tracker::UsageEvent ev;
+        ev.type          = tracker::EventType::DENIAL;
+        ev.feature       = msg.feature;
+        ev.user          = msg.username;
+        ev.client_host   = msg.client_host;
+        ev.denial_reason = final_ack.denial_reason;
+        ctx_.tracker->record(std::move(ev));
+    }
+    send(final_ack.encode());
 }
 
 void Connection::handle_checkin(const Packet& pkt) {

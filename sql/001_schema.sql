@@ -14,8 +14,10 @@ CREATE TABLE IF NOT EXISTS features (
     id        SERIAL PRIMARY KEY,
     server_id INTEGER NOT NULL REFERENCES servers(id) ON DELETE CASCADE,
     feature   TEXT    NOT NULL,
+    vendor    TEXT,
     total     INTEGER NOT NULL DEFAULT 0,
     in_use    INTEGER NOT NULL DEFAULT 0,
+    queued    INTEGER NOT NULL DEFAULT 0,
     polled_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_features_feature   ON features(feature);
@@ -60,10 +62,11 @@ CREATE INDEX IF NOT EXISTS idx_health_events_occurred_at ON health_events(occurr
 CREATE OR REPLACE VIEW v_license_utilisation AS
 SELECT
     f.feature,
-    SUM(f.total)   AS total,
-    SUM(f.in_use)  AS in_use,
+    SUM(f.total)            AS total,
+    SUM(f.in_use)           AS in_use,
     SUM(f.total - f.in_use) AS available,
-    MAX(f.polled_at) AS last_polled
+    SUM(f.queued)           AS queued,
+    MAX(f.polled_at)        AS last_polled
 FROM features f
 JOIN servers s ON s.id = f.server_id
 WHERE f.polled_at = (

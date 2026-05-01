@@ -14,9 +14,10 @@ struct LmstatResult {
 
 class LmutilWrapper {
 public:
-    // Invokes: lmutil lmstat -a -c port@host
+    // Invokes: <lmutil_path> lmstat -a -c port@host
     // Always returns a result; check result.server_up for success.
-    static LmstatResult lmstat(const std::string& host, uint16_t port);
+    static LmstatResult lmstat(const std::string& host, uint16_t port,
+                               const std::string& lmutil_path = "lmutil");
 
     // Parse raw lmstat output text into an LmstatResult.
     // Exposed for unit testing without invoking lmutil.

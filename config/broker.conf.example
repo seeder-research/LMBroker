@@ -2,8 +2,10 @@
 # Copy to /etc/flexlm-broker/broker.conf and edit.
 
 [broker]
-host = 0.0.0.0
-port = 27000
+host    = 0.0.0.0
+port    = 27000
+# Number of worker threads for handling client connections (default: 32)
+threads = 32
 
 [api]
 host  = 0.0.0.0
@@ -17,6 +19,9 @@ token = changeme
 poll_interval_sec  = 30
 # Mark a backend unhealthy after this many consecutive failed polls
 failover_threshold = 3
+# Full path to the lmutil binary. Defaults to "lmutil" (must be on PATH).
+# Set this if lmutil is not on PATH or you need to select a specific version.
+# lmutil_path = /opt/flexlm/lmutil
 
 # Declare each backend FlexLM server as its own [server.N] block.
 # N can be any unique label (1, 2, primary, secondary, …).

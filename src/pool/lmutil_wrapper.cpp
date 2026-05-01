@@ -5,6 +5,7 @@
 #include <spdlog/spdlog.h>
 #include <cerrno>
 #include <cstring>
+#include <sys/wait.h>
 
 namespace pool {
 
@@ -74,9 +75,9 @@ LmstatResult LmutilWrapper::parse_lmstat(const std::string& output) {
     static const std::regex re_vendor_up(
         R"(^\s*(\w+):\s+UP\b)", std::regex::icase);
     static const std::regex re_uncounted(
-        R"(Users of (\S+):\s+\(Uncounted\))", std::regex::icase);
+        R"(Users of (\S+):\s+\(Uncounted[^)]*\))", std::regex::icase);
     static const std::regex re_counted(
-        R"(Users of (\S+):\s+\(Total of (\d+) licenses?\s+issued;\s+(\d+) licenses?\s+in use\))",
+        R"(Users of (\S+):\s+\(Total of (\d+) licenses?\s+issued;\s+(?:Total of )?(\d+) licenses?\s+in use\))",
         std::regex::icase);
     static const std::regex re_queued(
         R"(\((\d+) licenses?\s+queued\))", std::regex::icase);
@@ -135,8 +136,9 @@ LmstatResult LmutilWrapper::parse_lmstat(const std::string& output) {
 
 // ── lmutil invocation ─────────────────────────────────────────────────────────
 
-LmstatResult LmutilWrapper::lmstat(const std::string& host, uint16_t port) {
-    std::string cmd = "lmutil lmstat -a -c "
+LmstatResult LmutilWrapper::lmstat(const std::string& host, uint16_t port,
+                                   const std::string& lmutil_path) {
+    std::string cmd = lmutil_path + " lmstat -a -c "
                     + std::to_string(port) + "@" + host + " 2>&1";
     FILE* pipe = popen(cmd.c_str(), "r");
     if (!pipe) {
@@ -147,8 +149,12 @@ LmstatResult LmutilWrapper::lmstat(const std::string& host, uint16_t port) {
     char buf[512];
     while (fgets(buf, sizeof(buf), pipe)) output += buf;
     int rc = pclose(pipe);
+    if (WIFEXITED(rc) && WEXITSTATUS(rc) == 127) {
+        spdlog::error("[lmutil] lmutil not found on PATH — cannot probe {}:{}", host, port);
+        LmstatResult r; r.error_msg = "lmutil not found on PATH"; return r;
+    }
     if (rc != 0)
-        spdlog::debug("[lmutil] lmstat exit={} for {}:{}", rc, host, port);
+        spdlog::debug("[lmutil] lmstat exit={} for {}:{}", WEXITSTATUS(rc), host, port);
     return parse_lmstat(output);
 }
 

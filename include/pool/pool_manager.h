@@ -48,9 +48,13 @@ public:
     // Aggregated feature counts across all healthy backends
     std::vector<FeatureCount> aggregated_features() const;
 
-    // Pick a healthy backend that has the requested feature available.
-    // Returns nullptr if none available (caller must check).
-    const common::ServerEntry* select_backend(const std::string& feature) const;
+    // Pick a healthy backend that has at least `count` seats of `feature`
+    // available. Backends in `excluded` (as "host:port" strings) are skipped.
+    // Returns nullptr if no suitable backend exists.
+    const common::ServerEntry* select_backend(
+            const std::string& feature,
+            int count = 1,
+            const std::vector<std::string>& excluded = {}) const;
 
     std::vector<BackendStatus> backend_statuses() const;
 

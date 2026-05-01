@@ -39,7 +39,7 @@ void PoolManager::poll_loop() {
 }
 
 void PoolManager::poll_server(BackendStatus& bs) {
-    auto res = LmutilWrapper::lmstat(bs.server.host, bs.server.port);
+    auto res = LmutilWrapper::lmstat(bs.server.host, bs.server.port, cfg_.lmutil_path);
 
     if (!res.server_up) {
         bs.fail_streak++;
@@ -152,12 +152,17 @@ std::vector<FeatureCount> PoolManager::aggregated_features() const {
 }
 
 const common::ServerEntry* PoolManager::select_backend(
-        const std::string& feature) const {
+        const std::string& feature,
+        int count,
+        const std::vector<std::string>& excluded) const {
     std::lock_guard<std::mutex> lk(mtx_);
     for (const auto& bs : backends_) {
         if (!bs.healthy) continue;
+        std::string key = bs.server.host + ":" + std::to_string(bs.server.port);
+        if (std::find(excluded.begin(), excluded.end(), key) != excluded.end())
+            continue;
         for (const auto& f : bs.features)
-            if (f.feature == feature && f.available > 0)
+            if (f.feature == feature && f.available >= count)
                 return &bs.server;
     }
     return nullptr;

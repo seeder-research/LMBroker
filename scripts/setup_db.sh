@@ -24,7 +24,7 @@ SELECT 'CREATE DATABASE $DB OWNER $USER'
 SQL
 
 echo "[db] Applying schema..."
-psql -U "$USER" -d "$DB" -f "$SCHEMA"
+PGPASSWORD="$PASS" psql -h localhost -U "$USER" -d "$DB" -f "$SCHEMA"
 
 echo "[db] Database '$DB' ready."
 echo "[db] Connection string: host=localhost dbname=$DB user=$USER password=$PASS"
