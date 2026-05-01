@@ -58,6 +58,7 @@ Config Config::load(const std::string& path) {
         } else if (section == "pool") {
             if (key == "poll_interval_sec") cfg.poll_interval_sec = std::stoi(val);
             else if (key == "failover_threshold") cfg.failover_threshold = std::stoi(val);
+            else if (key == "lmutil_path") cfg.lmutil_path = val;
         } else if (section == "database") {
             if (key == "connstr") cfg.db_connstr = val;
         } else if (section == "logging") {

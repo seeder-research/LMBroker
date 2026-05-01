@@ -32,8 +32,9 @@ struct Config {
 
     // Backend pool
     std::vector<ServerEntry> servers;
-    int poll_interval_sec{30};
-    int failover_threshold{3};
+    int         poll_interval_sec{30};
+    int         failover_threshold{3};
+    std::string lmutil_path{"lmutil"};
 
     // PostgreSQL
     std::string db_connstr;

@@ -37,10 +37,9 @@ sudo apt install -y \
 (e.g. MathWorks, Synopsys, Cadence). The broker shells out to it to query
 backend servers.
 
-- It must be on `PATH` when the broker runs.
+- It must be on `PATH` when the broker runs, **or** you can set the full path
+  in `broker.conf` (see Step 5).
 - Test it: `lmutil lmstat -c 27000@your-license-server`
-- If `lmutil` is not on `PATH`, set `LMUTIL` in your environment or symlink
-  it to `/usr/local/bin/lmutil`.
 
 ### PostgreSQL
 
@@ -244,6 +243,7 @@ token = <your-token>   # required for all API calls except /health and /metrics
 [pool]
 poll_interval_sec  = 30   # how often to query each backend with lmutil
 failover_threshold = 3    # consecutive failures before marking a backend unhealthy
+# lmutil_path = /opt/flexlm/lmutil   # full path if lmutil is not on PATH
 
 # One block per backend license server. Labels must be unique.
 [server.1]

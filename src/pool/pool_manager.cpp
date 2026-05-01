@@ -39,7 +39,7 @@ void PoolManager::poll_loop() {
 }
 
 void PoolManager::poll_server(BackendStatus& bs) {
-    auto res = LmutilWrapper::lmstat(bs.server.host, bs.server.port);
+    auto res = LmutilWrapper::lmstat(bs.server.host, bs.server.port, cfg_.lmutil_path);
 
     if (!res.server_up) {
         bs.fail_streak++;

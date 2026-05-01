@@ -136,8 +136,9 @@ LmstatResult LmutilWrapper::parse_lmstat(const std::string& output) {
 
 // ── lmutil invocation ─────────────────────────────────────────────────────────
 
-LmstatResult LmutilWrapper::lmstat(const std::string& host, uint16_t port) {
-    std::string cmd = "lmutil lmstat -a -c "
+LmstatResult LmutilWrapper::lmstat(const std::string& host, uint16_t port,
+                                   const std::string& lmutil_path) {
+    std::string cmd = lmutil_path + " lmstat -a -c "
                     + std::to_string(port) + "@" + host + " 2>&1";
     FILE* pipe = popen(cmd.c_str(), "r");
     if (!pipe) {
