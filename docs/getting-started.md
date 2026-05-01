@@ -110,9 +110,50 @@ The binary is at `build/flexlm-broker`.
 
 ### 4a. Start PostgreSQL (if not already running)
 
+**Ubuntu / Debian** — the apt package auto-initialises the cluster, so you can
+start the service directly:
+
 ```bash
 sudo systemctl start postgresql
 sudo systemctl enable postgresql  # start on boot
+```
+
+**RHEL / CentOS / Fedora** — you must initialise the data directory once before
+the service will start:
+
+```bash
+# RHEL 8+ / CentOS Stream / Fedora
+sudo postgresql-setup --initdb
+
+# RHEL 7 / older CentOS
+sudo postgresql-setup initdb
+
+sudo systemctl start postgresql
+sudo systemctl enable postgresql
+```
+
+After initialising, edit `pg_hba.conf` so the broker can authenticate over TCP
+with a password.  The default RHEL config uses `ident` for local TCP
+connections, which rejects password logins:
+
+```bash
+# Find the file location
+sudo -u postgres psql -c "SHOW hba_file;"
+```
+
+In `pg_hba.conf`, change the `127.0.0.1/32` and `::1/128` lines from `ident`
+to `scram-sha-256` (PostgreSQL ≥ 14) or `md5` (older versions):
+
+```
+# TYPE  DATABASE  USER  ADDRESS          METHOD
+host    all       all   127.0.0.1/32     scram-sha-256
+host    all       all   ::1/128          scram-sha-256
+```
+
+Then reload PostgreSQL to apply the change:
+
+```bash
+sudo systemctl reload postgresql
 ```
 
 ### 4b. Create the database, user, and schema
@@ -409,6 +450,22 @@ clients without interruption.
   confirm it lists features. If it does not, the parser may need tuning for
   your specific `lmutil` version.
 
+### PostgreSQL service fails to start
+
+On RHEL/CentOS the data directory is not initialised automatically.  Run the
+one-time init step and then start:
+
+```bash
+sudo postgresql-setup --initdb   # RHEL 8+ / CentOS Stream
+sudo systemctl start postgresql
+```
+
+If the service still fails, check the journal for details:
+
+```bash
+sudo journalctl -u postgresql --no-pager | tail -30
+```
+
 ### Database connection errors
 
 ```
@@ -420,6 +477,16 @@ Re-run `scripts/setup_db.sh` or create the role manually:
 ```sql
 CREATE USER broker WITH PASSWORD 'changeme';
 GRANT ALL PRIVILEGES ON DATABASE flexlm TO broker;
+```
+
+**RHEL/CentOS only — password auth rejected over TCP**
+
+If you see `FATAL: Ident authentication failed for user "broker"`, the
+`pg_hba.conf` is still using `ident` for local TCP connections.  Change those
+lines to `scram-sha-256` (or `md5`) as described in Step 4a, then reload:
+
+```bash
+sudo systemctl reload postgresql
 ```
 
 ### Port 27000 already in use
