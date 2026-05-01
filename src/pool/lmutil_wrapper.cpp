@@ -5,6 +5,7 @@
 #include <spdlog/spdlog.h>
 #include <cerrno>
 #include <cstring>
+#include <sys/wait.h>
 
 namespace pool {
 
@@ -147,8 +148,12 @@ LmstatResult LmutilWrapper::lmstat(const std::string& host, uint16_t port) {
     char buf[512];
     while (fgets(buf, sizeof(buf), pipe)) output += buf;
     int rc = pclose(pipe);
+    if (WIFEXITED(rc) && WEXITSTATUS(rc) == 127) {
+        spdlog::error("[lmutil] lmutil not found on PATH — cannot probe {}:{}", host, port);
+        LmstatResult r; r.error_msg = "lmutil not found on PATH"; return r;
+    }
     if (rc != 0)
-        spdlog::debug("[lmutil] lmstat exit={} for {}:{}", rc, host, port);
+        spdlog::debug("[lmutil] lmstat exit={} for {}:{}", WEXITSTATUS(rc), host, port);
     return parse_lmstat(output);
 }
 
