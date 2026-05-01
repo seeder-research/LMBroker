@@ -51,6 +51,7 @@ Config Config::load(const std::string& path) {
         if (section == "broker") {
             if (key == "host") cfg.broker_host = val;
             else if (key == "port") cfg.broker_port = static_cast<uint16_t>(std::stoi(val));
+            else if (key == "threads") cfg.broker_threads = std::stoi(val);
         } else if (section == "api") {
             if (key == "host") cfg.api_host = val;
             else if (key == "port") cfg.api_port = static_cast<uint16_t>(std::stoi(val));

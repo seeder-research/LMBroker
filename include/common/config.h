@@ -24,6 +24,7 @@ struct Config {
     // Broker listener
     uint16_t    broker_port{27000};
     std::string broker_host{"0.0.0.0"};
+    int         broker_threads{32};
 
     // REST API
     uint16_t    api_port{8080};

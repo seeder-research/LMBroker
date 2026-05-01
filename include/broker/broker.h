@@ -35,7 +35,6 @@ private:
     std::unique_ptr<ThreadPool>             thread_pool_;
     std::atomic<size_t>                     active_connections_{0};
 
-    static constexpr size_t kDefaultThreads  = 32;
     static constexpr size_t kDefaultMaxQueue = 2048;
 };
 
