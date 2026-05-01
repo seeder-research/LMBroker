@@ -6,4 +6,5 @@ add_library(api_lib
 target_include_directories(api_lib PUBLIC ${CMAKE_SOURCE_DIR}/include)
 target_link_libraries(api_lib PUBLIC
   common_lib pool_lib tracker_lib
-  httplib nlohmann_json Threads::Threads)
+  httplib nlohmann_json Threads::Threads
+  OpenSSL::SSL OpenSSL::Crypto)

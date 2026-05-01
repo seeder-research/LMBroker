@@ -14,6 +14,7 @@ if(ENABLE_ASAN)
 endif()
 
 find_package(Threads REQUIRED)
+find_package(OpenSSL REQUIRED)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(LIBPQ REQUIRED libpq)
 
@@ -21,9 +22,9 @@ pkg_check_modules(LIBPQ REQUIRED libpq)
 # Prefer system package (apt: nlohmann-json3-dev), fall back to vendored
 find_path(NLOHMANN_INCLUDE_DIR nlohmann/json.hpp
   PATHS /usr/include /usr/local/include
-        ${CMAKE_SOURCE_DIR}/third_party/nlohmann)
+        ${CMAKE_SOURCE_DIR}/third_party)
 if(NOT NLOHMANN_INCLUDE_DIR)
-  message(FATAL_ERROR "nlohmann/json not found. Run: apt install nlohmann-json3-dev")
+  message(FATAL_ERROR "nlohmann/json not found. Run: apt install nlohmann-json3-dev  (or place json.hpp at third_party/nlohmann/json.hpp)")
 endif()
 add_library(nlohmann_json INTERFACE)
 target_include_directories(nlohmann_json INTERFACE ${NLOHMANN_INCLUDE_DIR})
