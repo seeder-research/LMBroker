@@ -11,14 +11,14 @@ export PGPASSWORD
 SQL_DIR="$(cd "$(dirname "$0")/../sql" && pwd)"
 
 echo "[migrate] Ensuring schema_migrations table exists..."
-psql -U "$USER" -d "$DB" -f "$SQL_DIR/000_migrations.sql" -q
+psql -h localhost -U "$USER" -d "$DB" -f "$SQL_DIR/000_migrations.sql" -q
 
 echo "[migrate] Applying migrations from $SQL_DIR ..."
 for f in "$SQL_DIR"/0[0-9][1-9]_*.sql; do
     echo "[migrate]   -> $(basename "$f")"
-    psql -U "$USER" -d "$DB" -f "$f" -q
+    psql -h localhost -U "$USER" -d "$DB" -f "$f" -q
 done
 
 echo "[migrate] Applied migrations:"
-psql -U "$USER" -d "$DB" -c \
+psql -h localhost -U "$USER" -d "$DB" -c \
     "SELECT version, description, applied_at FROM schema_migrations ORDER BY version;"
