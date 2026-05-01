@@ -75,9 +75,9 @@ LmstatResult LmutilWrapper::parse_lmstat(const std::string& output) {
     static const std::regex re_vendor_up(
         R"(^\s*(\w+):\s+UP\b)", std::regex::icase);
     static const std::regex re_uncounted(
-        R"(Users of (\S+):\s+\(Uncounted\))", std::regex::icase);
+        R"(Users of (\S+):\s+\(Uncounted[^)]*\))", std::regex::icase);
     static const std::regex re_counted(
-        R"(Users of (\S+):\s+\(Total of (\d+) licenses?\s+issued;\s+(\d+) licenses?\s+in use\))",
+        R"(Users of (\S+):\s+\(Total of (\d+) licenses?\s+issued;\s+(?:Total of )?(\d+) licenses?\s+in use\))",
         std::regex::icase);
     static const std::regex re_queued(
         R"(\((\d+) licenses?\s+queued\))", std::regex::icase);
